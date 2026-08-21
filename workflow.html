@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Used-Car Search Workflow</title>
+<style>
+:root{
+  --bg:#fbfaf8; --panel:#ffffff; --ink:#1c1a17; --muted:#6b6560; --line:#e3ded7;
+  --free:#2f7d5d; --free-bg:#e8f4ee; --cost:#a8552b; --cost-bg:#fbeee5;
+  --gate:#3f6ea8; --gate-bg:#e9f0f8; --warn:#8a6d1f; --warn-bg:#faf3df;
+  --you:#6b4a8f; --you-bg:#f1ebf7; --tool:#1f7a72; --tool-bg:#e5f3f1;
+}
+@media (prefers-color-scheme:dark){
+  :root{ --bg:#16151a; --panel:#1e1d23; --ink:#eceaf0; --muted:#a09aa8; --line:#33313b;
+    --free:#6cc79b; --free-bg:#1b2f27; --cost:#e0996c; --cost-bg:#33241b;
+    --gate:#84b0e0; --gate-bg:#1a2634; --warn:#d7bb6a; --warn-bg:#2e2718;
+    --you:#b998df; --you-bg:#272033; --tool:#5fc4ba; --tool-bg:#132a27; }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:16px/1.6 ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:1080px;margin:0 auto;padding:48px 24px 96px}
+header{border-bottom:1px solid var(--line);padding-bottom:28px;margin-bottom:40px}
+h1{font-size:32px;line-height:1.2;margin:0 0 10px;letter-spacing:-.02em}
+.sub{color:var(--muted);font-size:15px;max-width:64ch;margin:0}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);
+  margin:52px 0 18px;font-weight:600}
+.big-idea{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--gate);
+  border-radius:10px;padding:22px 26px;margin:32px 0}
+.big-idea strong{font-size:18px;display:block;margin-bottom:8px}
+.big-idea p{margin:0;color:var(--muted);font-size:15px}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 32px}
+.chip{font-size:12.5px;padding:5px 12px;border-radius:99px;font-weight:600;border:1px solid transparent}
+.c-free{background:var(--free-bg);color:var(--free);border-color:var(--free)}
+.c-cost{background:var(--cost-bg);color:var(--cost);border-color:var(--cost)}
+.c-gate{background:var(--gate-bg);color:var(--gate);border-color:var(--gate)}
+.c-you{background:var(--you-bg);color:var(--you);border-color:var(--you)}
+.c-tool{background:var(--tool-bg);color:var(--tool);border-color:var(--tool)}
+.flow{position:relative}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:start;margin-bottom:14px}
+@media(max-width:760px){.row{grid-template-columns:1fr;gap:10px}}
+.node{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:16px 18px;
+  border-left:4px solid var(--line)}
+.node.free{border-left-color:var(--free)}
+.node.cost{border-left-color:var(--cost)}
+.node.gate{border-left-color:var(--gate)}
+.node.you{border-left-color:var(--you)}
+.node.tool{border-left-color:var(--tool)}
+.node .n{font-size:11.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+  display:block;margin-bottom:5px}
+.node h3{margin:0 0 7px;font-size:17px;letter-spacing:-.01em}
+.node p{margin:0;font-size:14.5px;color:var(--muted)}
+.node code{font-size:12.5px;background:var(--bg);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+.why{font-size:14.5px;color:var(--muted);padding:16px 18px 16px 20px;border-left:2px solid var(--line)}
+.why b{color:var(--ink);font-weight:650}
+.arrow{text-align:center;color:var(--line);font-size:22px;line-height:1;margin:2px 0 10px;
+  grid-column:1/2}
+@media(max-width:760px){.arrow{grid-column:1}}
+.loop{text-align:center;color:var(--gate);font-size:13px;font-weight:600;margin:2px 0 10px;
+  grid-column:1/2;padding:6px 0}
+@media(max-width:760px){.loop{grid-column:1}}
+table{width:100%;border-collapse:collapse;margin:12px 0 0;font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600}
+td code{font-size:12.5px;background:var(--bg);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+.reject{color:var(--cost);font-weight:600}
+.keep{color:var(--free);font-weight:600}
+.dead{color:var(--muted);text-decoration:line-through}
+.callout{background:var(--warn-bg);border:1px solid var(--line);border-left:4px solid var(--warn);
+  border-radius:10px;padding:18px 22px;margin:26px 0;font-size:14.5px}
+.callout b{color:var(--ink)}
+.grid16{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:18px 0}
+.cell{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:13px}
+.cell .p{font-weight:700;font-size:12.5px;margin-bottom:6px}
+.cell .s{display:flex;justify-content:space-between;color:var(--muted);font-size:11.5px;padding:2px 0}
+.cell .s.done{color:var(--free);font-weight:600}
+.cell .s.wip{color:var(--warn);font-weight:600}
+@media(max-width:700px){.grid16{grid-template-columns:1fr 1fr}}
+.tierwrap{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:18px 0}
+@media(max-width:760px){.tierwrap{grid-template-columns:1fr}}
+.tier{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:18px 20px}
+.tier h4{margin:0 0 8px;font-size:15px}
+.tier p{margin:0 0 8px;color:var(--muted);font-size:14px}
+.tier ul{margin:0;padding-left:18px;color:var(--muted);font-size:13.5px}
+footer{margin-top:64px;padding-top:22px;border-top:1px solid var(--line);color:var(--muted);font-size:13.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Used-Car Search Workflow</h1>
+  <p class="sub">How a Marketplace run actually works, stage by stage — and why each gate is where it is.
+  Section numbers refer to <code>used_car_buying_playbook.md</code>. Rebuilt 2026-08-20 after the brand-loop
+  model was retired.</p>
+</header>
+
+<div class="big-idea">
+  <strong>Two ideas run this whole design: rejection should be free, and don't scroll the same feed twice.</strong>
+  <p>Opening a listing is the expensive step. Every rejection that happens before that — from the card, or
+  mechanically during capture — costs nothing. Separately: Facebook's own filters can't narrow the feed by
+  brand, so the sweep no longer tries. It varies <b>price</b> and <b>sort</b> only — the two parameters that
+  actually change what comes back — and lets a tool, not a human judgment call, do the repetitive
+  extraction and dedup.</p>
+</div>
+
+<div class="legend">
+  <span class="chip c-free">Free — nothing opened</span>
+  <span class="chip c-cost">Expensive — costs a listing open</span>
+  <span class="chip c-gate">Setup / bookkeeping</span>
+  <span class="chip c-tool">Mechanical tool — no judgment</span>
+  <span class="chip c-you">You, not the assistant</span>
+</div>
+
+<h2>The 16-checkpoint grid</h2>
+<p style="color:var(--muted);font-size:14.5px;margin:0 0 4px">4 price slices × 4 sorts. No brand column —
+Facebook's Make filter doesn't restrict or resample the feed (<code>make=Honda</code> and
+<code>make=Toyota</code> returned 20 of the same 24 listings, tested live 2026-08-20). Brand separation
+happens later, during triage. The fourth sort, <code>Suggested</code>, is Facebook's default sort and is
+represented by omitting <code>sortBy</code> from the URL.</p>
+<div class="grid16">
+  <div class="cell"><div class="p">$4,000–$5,999</div>
+    <div class="s">distance_ascend <span>checkpoint</span></div>
+    <div class="s">vehicle_mileage_ascend <span>checkpoint</span></div>
+    <div class="s">creation_time_descend <span>checkpoint</span></div>
+    <div class="s">Suggested <span>checkpoint</span></div>
+  </div>
+  <div class="cell"><div class="p">$6,000–$7,499</div>
+    <div class="s">distance_ascend <span>checkpoint</span></div>
+    <div class="s">vehicle_mileage_ascend <span>checkpoint</span></div>
+    <div class="s">creation_time_descend <span>checkpoint</span></div>
+    <div class="s">Suggested <span>checkpoint</span></div>
+  </div>
+  <div class="cell"><div class="p">$7,500–$8,999</div>
+    <div class="s">distance_ascend <span>checkpoint</span></div>
+    <div class="s">vehicle_mileage_ascend <span>checkpoint</span></div>
+    <div class="s">creation_time_descend <span>checkpoint</span></div>
+    <div class="s">Suggested <span>checkpoint</span></div>
+  </div>
+  <div class="cell"><div class="p">$9,000–$10,500</div>
+    <div class="s">distance_ascend <span>checkpoint</span></div>
+    <div class="s">vehicle_mileage_ascend <span>checkpoint</span></div>
+    <div class="s">creation_time_descend <span>checkpoint</span></div>
+    <div class="s">Suggested <span>checkpoint</span></div>
+  </div>
+</div>
+<p style="color:var(--muted);font-size:13px;margin:4px 0 0">This visual deliberately does not duplicate live progress. Current counts and cell status live only in <code>search_checkpoint.md</code>. Sort order: distance, mileage, newest, then Suggested.</p>
+
+<h2>Stage by stage</h2>
+
+<div class="flow">
+
+  <div class="row">
+    <div class="node gate"><span class="n">Stage 0</span><h3>Load state</h3>
+      <p>Read the playbook, the checkpoint grid, and the tracker before touching a browser.</p></div>
+    <div class="why">Three files, three questions: <b>what are the rules</b>, <b>which grid cell is next</b>,
+      and <b>which listings have already been judged</b>. The grid cell — not a brand — is what "resume"
+      means now.</div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="row">
+    <div class="node gate"><span class="n">Stage 1</span><h3>Build the URL for one grid cell</h3>
+      <p>One price slice, one sort. <span class="dead">No brand parameter.</span></p></div>
+    <div class="why"><b>Only price and sort are real.</b> <code>minPrice</code>/<code>maxPrice</code> are
+      applied strictly. <code>sortBy</code> genuinely returns a different slice of the pool per value.
+      <code>make=</code>, <code>topLevelVehicleType=</code>, <code>maxYear=</code> and <code>carType=</code>
+      are all cosmetic — see the callout below — so none of them are worth setting.</div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="row">
+    <div class="node you"><span class="n">Stage 2</span><h3>Human scroll</h3>
+      <p>You scroll the tab to the bottom by hand. The assistant does not scroll.</p></div>
+    <div class="why">Automated scrolling never fires Facebook's loader — confirmed at the network layer,
+      zero fetch requests on programmatic scroll. Manual scrolling with ordinary pauses works normally and
+      has produced feeds over 300 cards deep from a single query.</div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="row">
+    <div class="node tool"><span class="n">Stage 3</span><h3><code>mp.js read --out</code></h3>
+      <p>Extracts every card from the DOM — id, year, make, model, price, city, true SERP rank — to one JSON file per pass.</p></div>
+    <div class="why">Mechanical, zero judgment. Reads the tracking blob Facebook attaches to each result link
+      for its real search-result position, which is more reliable than DOM order alone. One file per capture,
+      never hand-edited.</div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="row">
+    <div class="node tool"><span class="n">Stage 4</span><h3><code>merge.js</code></h3>
+      <p>Folds every capture JSON into one deduped <code>captures/master.csv</code>. Drops motorcycles/boats/trailers by keyword; nothing else.</p></div>
+    <div class="why">Also mechanical — no brand list, no price ceiling, no criteria live in this file
+      (see <code>CLAUDE.md</code>: tools move cards, the playbook decides). It tracks which passes saw each
+      listing and flags price changes between passes, which is what makes 16 overlapping scrolls cheap
+      instead of repetitive.</div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="row">
+    <div class="node free"><span class="n">Stage 5 — the important one</span><h3>Card-level triage</h3>
+      <p>Read <code>master.csv</code>. Six checks, all free — nothing opened yet.</p>
+      <table>
+        <tr><th>Check</th><th>Where</th><th>Outcome</th></tr>
+        <tr><td>Brand</td><td>First words of title</td><td class="reject">Not on the 9-brand list → reject</td></tr>
+        <tr><td>Body type</td><td>Title suffix / keyword</td><td class="reject">Minivan / pickup / van → reject</td></tr>
+        <tr><td>Asking price</td><td>Card</td><td class="reject">Over $10,500 → reject</td></tr>
+        <tr><td>Year vs. price</td><td>Title year + price</td><td class="reject">2019+ at ≤$10,500 → flag</td></tr>
+        <tr><td>City</td><td>Card</td><td class="keep">Score it, don't reject</td></tr>
+        <tr><td>Struck price</td><td>Card</td><td class="keep">Negotiability signal</td></tr>
+      </table>
+    </div>
+    <div class="why"><b>Title triage is necessary but not sufficient.</b> A real capture caught a Hyundai
+      Sonata typed as "Honda Sonata" by the seller — brand-matching on title text alone produces false
+      positives, so survivors still get a second look before scoring. Minivans and cargo vans have also
+      slipped through a brand match on this same pass; body type needs its own check even for an approved
+      brand.</div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="row">
+    <div class="node gate"><span class="n">Stage 6</span><h3>Dedupe against the tracker</h3>
+      <p>Permanent rejections never re-open. Price rejections do.</p></div>
+    <div class="why">Because the grid runs the same pool through up to 16 overlapping passes (measured
+      overlap on one pair of passes: 83%), this step is where most of the time savings actually come from —
+      not from finding new cars, but from instantly skipping ones already judged.</div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="row">
+    <div class="node cost"><span class="n">Stage 7</span><h3>Open the listing</h3>
+      <p>One reusable tab. Mileage and title status live only here, never on the card.</p></div>
+    <div class="why">The full description is also only here — financing language, disclosed defects, and
+      curbstoning tells are read once and captured completely, never reopened for one more field.</div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="row">
+    <div class="node cost"><span class="n">Stage 8</span><h3>Hard filters, reliability, scoring</h3>
+      <p>Mileage · title · red flags (§6) · exact model/powertrain reliability · <b>8+ Strong</b> · <b>4–7 Worth a look</b> · <b>below 4 Marginal</b>.</p></div>
+    <div class="why">Unverified financing-ad prices score zero on price band and are capped below Strong
+      until the seller confirms a real cash price. Reliability research is the most expensive step in the
+      pipeline, which is why it only ever runs on listings that survived everything free first.</div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="row">
+    <div class="node gate"><span class="n">Stage 9</span><h3>Persist &amp; checkpoint</h3>
+      <p>Update the tracker and checkpoint every 5 listings, then run the read-only <code>validate.js</code> before handoff.</p></div>
+    <div class="why">Two files, two jobs — <code>master.csv</code> is disposable and rebuildable from the raw
+      JSONs; <code>seen_listings.md</code> is the curated, hand-meaningful record and is never rewritten from
+      scratch.</div>
+  </div>
+  <div class="loop">↻ back to Stage 1 for the next incomplete grid cell</div>
+
+  <div class="row">
+    <div class="node you"><span class="n">Final stage</span><h3>Verification — you, not the assistant</h3>
+      <p>The assistant <b>never contacts sellers</b>. It writes the message; you send it.</p>
+      <table>
+        <tr><th>Distance</th><th>Required before you drive</th></tr>
+        <tr><td>0–10 mi</td><td>VIN + running-dashboard photo</td></tr>
+        <tr><td>10–20 mi</td><td>Plus written title status and cash price</td></tr>
+        <tr><td>20+ mi</td><td>Plus cold-start video, odometer photo, defect answers, confirmed appointment</td></tr>
+      </table>
+    </div>
+    <div class="why">Bands are computed from Pembroke Pines now, not Fort Lauderdale (§7) — Miami-Dade got
+      closer, Boca Raton and Palm Beach County got further. The bar scales with the drive, not with how
+      promising the listing looks.</div>
+  </div>
+
+</div>
+
+<h2>The two-tier log</h2>
+<div class="tierwrap">
+  <div class="tier">
+    <h4 style="color:var(--tool)">Tier 1 — raw capture</h4>
+    <p><code>captures/feeds/*.json</code> → <code>captures/master.csv</code></p>
+    <ul>
+      <li>Every vehicle card, every brand, every price</li>
+      <li>Written by <code>mp.js</code> + <code>merge.js</code>, mechanically</li>
+      <li>Never edited by hand</li>
+      <li>Disposable — <code>master.csv</code> regenerates from the JSONs anytime</li>
+    </ul>
+  </div>
+  <div class="tier">
+    <h4 style="color:var(--you)">Tier 2 — curated tracker</h4>
+    <p><code>seen_listings.md</code></p>
+    <ul>
+      <li>Only approved-brand cars actually triaged</li>
+      <li>Written by the assistant, with reasoning</li>
+      <li>Hand-meaningful — this is what you'd actually read</li>
+      <li>Append/update in place, never rewritten from scratch</li>
+    </ul>
+  </div>
+</div>
+
+<h2>The thing Facebook doesn't tell you</h2>
+<div class="callout">
+  <b>Almost every vehicle filter in the sidebar is cosmetic.</b> Make, Body style, Vehicle type
+  (Cars &amp; Trucks), and Year all accept the parameter, render as "active" in the sidebar, and change
+  nothing about the returned results. Year was the last one tested: with <code>maxYear=2018</code> showing
+  active, the feed still returned a 2022, a 2023, a 2025 and a 2026 model year. Make doesn't even resample —
+  <code>make=Honda</code> and <code>make=Toyota</code> returned 20 of the same 24 IDs at identical
+  price/sort/location. The <code>radius</code> parameter is cosmetic too; the real 40-mile radius is a soft
+  relevance hint, not a boundary — out-of-radius cities appear interleaved throughout the feed, not appended
+  after nearby ones run out.
+  <br><br>
+  <b>What actually works:</b> <code>minPrice</code>/<code>maxPrice</code> (strict), <code>sortBy</code>
+  (genuinely resamples), and <code>maxMileage</code> (advisory — leaks, always re-verify on the listing
+  page). That's the entire filter surface the grid is built on. Everything else is triaged by hand, from the
+  card — that's the whole reason Stage 5 exists.
+</div>
+
+<footer>
+  Reference for <code>car-scraper</code>. Rules live in <code>used_car_buying_playbook.md</code>;
+  current grid position in <code>search_checkpoint.md</code>; listing history in <code>seen_listings.md</code>;
+  raw captures in <code>captures/</code>; extraction tooling in <code>tools/marketplace-cdp/</code>.
+</footer>
+
+</div>
+</body>
+</html>

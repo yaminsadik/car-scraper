@@ -1,0 +1,30 @@
+# macOS / editor noise
+.DS_Store
+.idea/
+.vscode/
+*.log
+*.tmp
+
+# Dependencies and local browser state
+node_modules/
+tools/marketplace-cdp/node_modules/
+tools/marketplace-cdp/.marketplace-target.json
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Private, generated Marketplace data
+captures/*
+!captures/README.md
+seen_listings.md
+search_checkpoint.md
+
+# Historical private search data; keep only the public archive policy
+archive/*
+!archive/README.md
+
+# Public starter state (some global Git ignore files exclude template folders)
+!templates/
+!templates/*.md

@@ -1,0 +1,17 @@
+{
+  "name": "marketplace-cdp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Read Facebook Marketplace search results out of a signed-in Chrome tab over the DevTools Protocol.",
+  "main": "mp.js",
+  "scripts": {
+    "tabs": "node mp.js tabs",
+    "read": "node mp.js read",
+    "merge": "node merge.js",
+    "validate": "node validate.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
