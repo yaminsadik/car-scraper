@@ -12,6 +12,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { parseRow } = require('./mp');
 
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
 const DEFAULT_FEED_DIR = path.join(PROJECT_ROOT, 'captures', 'feeds');
@@ -45,7 +46,35 @@ const HONDA_NON_CAR_MODEL =
 const SUZUKI_MOTORCYCLE_MODEL =
   /^(?:gsx-?[rs]?\d*|hayabusa|boulevard|v-?strom|dr-?z?\d*|katana|burgman|sv\d+|rm-?z?\d*)/i;
 
+// Every make Marketplace realistically returns here, approved or not. This is
+// spelling vocabulary, not buying criteria — it answers "is this a recognisable
+// brand at all," never "is this a brand we want." A card that fails it is
+// flagged for a human to open, not dropped.
+const KNOWN_MAKES = new Set(
+  `acura alfa alfa-romeo amc aston astonmartin audi bentley bmw bugatti buick
+   cadillac chevrolet chevy chrysler citroen daewoo daihatsu datsun dodge eagle
+   ferrari fiat fisker ford genesis geo gmc honda hummer hyundai infiniti isuzu
+   jaguar jeep kia lamborghini lancia land landrover lexus lincoln lotus lucid
+   maserati maybach mazda mclaren mercedes mercedes-benz mercury mg mini
+   mitsubishi morgan nissan oldsmobile opel packard peugeot plymouth polestar
+   pontiac porsche ram renault rivian rolls rolls-royce saab saturn scion seat
+   skoda smart sterling studebaker subaru suzuki tesla toyota triumph vw
+   volkswagen volvo willys yugo`.split(/\s+/)
+);
+
 const normalize = (value) => String(value || '').trim().toLowerCase();
+
+// Why a card cannot be triaged from its title alone. Empty means it can.
+function reviewReason(row) {
+  const make = normalize(row.make);
+  const hasYear = /^\d{4}$/.test(String(row.year || ''));
+
+  if (!make && !hasYear) return 'no-title';
+  if (!make) return 'no-make';
+  if (!KNOWN_MAKES.has(make)) return 'unknown-make';
+  if (!hasYear) return 'no-year';
+  return '';
+}
 
 function isNonCar(row) {
   const label = String(row.label || '');
@@ -62,6 +91,15 @@ function isNonCar(row) {
     return true;
   }
   return false;
+}
+
+// Captures store the card's raw aria-label alongside the fields parsed at read
+// time, so re-deriving here makes a parser fix retroactive: a card the old
+// parser gave up on is recovered from history instead of needing a re-scroll.
+function reparse(row) {
+  if (!row || !row.label) return row;
+  const fresh = parseRow({ id: row.id, position: row.position, label: row.label });
+  return fresh.parsed ? { ...row, ...fresh } : row;
 }
 
 function captureTimestamp(capture) {
@@ -125,9 +163,10 @@ function mergeCaptures(captures, { keepAll = false } = {}) {
     const passName = path.basename(capture.file, '.json');
     let fresh = 0;
 
-    for (const row of capture.data.listings) {
+    for (const raw of capture.data.listings) {
       totalRows++;
-      if (!row || !row.id) continue;
+      if (!raw || !raw.id) continue;
+      const row = reparse(raw);
       if (!keepAll && isNonCar(row)) {
         dropped++;
         continue;
@@ -158,6 +197,7 @@ function mergeCaptures(captures, { keepAll = false } = {}) {
         previous.city = row.city ?? previous.city;
         previous.url = row.url || previous.url;
         previous.label = row.label ?? previous.label;
+        previous.review = reviewReason(previous);
         previous.last_pass = passName;
         previous.last_seen = capture.data.capturedAt || '';
         continue;
@@ -182,6 +222,7 @@ function mergeCaptures(captures, { keepAll = false } = {}) {
         _priceHistory: row.price == null ? [] : [row.price],
         url: row.url || `https://www.facebook.com/marketplace/item/${row.id}/`,
         label: row.label ?? '',
+        review: reviewReason(row),
       });
     }
 
@@ -214,6 +255,7 @@ const COLS = [
   'last_seen',
   'times_seen',
   'price_changed',
+  'review',
   'url',
   'label',
 ];
@@ -272,6 +314,21 @@ function main(args = process.argv.slice(2)) {
   console.log(`${result.rows.length} unique listings -> ${out}`);
   console.log(`${repeats} seen in more than one pass (${overlapPct}% overlap)`);
   console.log(`${result.rows.filter((row) => row.price_changed).length} price change(s) detected`);
+
+  const needsReview = result.rows.filter((row) => row.review);
+  if (needsReview.length) {
+    const byReason = needsReview.reduce((acc, row) => {
+      acc[row.review] = (acc[row.review] || 0) + 1;
+      return acc;
+    }, {});
+    const breakdown = Object.entries(byReason)
+      .map(([reason, count]) => `${count} ${reason}`)
+      .join(', ');
+    console.log(
+      `\n${needsReview.length} listing(s) cannot be triaged from the card title (${breakdown}).`
+    );
+    console.log('These count toward N and must be opened — see playbook §12.');
+  }
 }
 
 if (require.main === module) {
@@ -288,5 +345,6 @@ module.exports = {
   isNonCar,
   loadCaptures,
   mergeCaptures,
+  reviewReason,
   toCsv,
 };

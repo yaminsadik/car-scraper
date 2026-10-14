@@ -22,7 +22,22 @@ jobs:
           cache-dependency-path: tools/marketplace-cdp/package-lock.json
       - run: npm ci
       - run: npm test
-      - run: node --check cdp.js
-      - run: node --check mp.js
-      - run: node --check merge.js
-      - run: node --check validate.js
+      - run: for f in cdp mp merge validate deal msg inbox german_brands; do node --check "$f.js"; done
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      # No private captures exist in CI, so this reuses the committed snapshot and
+      # fails the build if that snapshot carries a VIN, phone number or seller field.
+      - run: npm run build
+      - run: npm run test:sites

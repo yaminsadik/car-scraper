@@ -21,9 +21,19 @@ reintroduce that.
 - **Rules, criteria, scoring, filters, output format** → the playbook
 - **Where the sweep currently stands** → `search_checkpoint.md`
 - **Which listings have been seen and why they were kept or dropped** → `seen_listings.md`
+- **Where a conversation with a seller stands** — VIN asked/received/checked,
+  photos reviewed, appointment booked → `deals/<listing-id>.md`, summarised in
+  `deals/INDEX.md`. Read the index, not the deal files, to see the whole board.
+- **Which conversations moved since the last sweep** → `node mp.js inbox`,
+  with the baseline in `captures/inbox/state.json`. Transcripts and downloaded
+  photos live in `captures/threads/`.
+- **Brand sweeps roadmap and execution instructions** → `BRAND_SWEEPS_PLAN.md`
 - **How the workflow fits together, and why** → `WORKFLOW.md` (prose) and
   `workflow.html` (visual). Explanatory only — they restate the playbook, they
   don't extend it. If they ever disagree with the playbook, the playbook wins.
+- **Why the pipeline is shaped the way it is, and how to design the next
+  one from end to end** → `PROCESS_DESIGN.md`. Method only; it holds no
+  buying criteria. The story behind it is the 2026-08-27 `DEV-JOURNAL.md` entry.
 - **Superseded findings and prior listing history** → `archive/`. Never read
   for deduplication.
 - **Getting the cards off the page** → `tools/marketplace-cdp/`. Mechanism
@@ -42,6 +52,51 @@ Any task involving searching, filtering, scoring or shortlisting listings:
 4. Update `seen_listings.md` per §12 for every listing opened — passes and
    rejections alike — before producing output.
 5. Update `search_checkpoint.md` at least every 5 new listings.
+
+## Tracking a conversation with a seller
+
+Once a seller replies, the listing stops being a search result and becomes a
+deal: a VIN to request and verify, a history report to file, photos to judge,
+an appointment to set. That lives in `deals/`, one markdown file per listing —
+**not** in `seen_listings.md`.
+
+The reason is mechanical. `seen_listings.md` is one table of 1,700+ rows and
+over a megabyte; changing a single cell means rewriting the whole file, and
+what a seller said is prose, not a cell. A deal file is about 2KB — read it
+whole, edit it freely.
+
+```bash
+node mp.js thread <listing-id>     # open that listing, read the seller conversation on it
+node mp.js inbox                   # find conversations that have no deal file yet
+node mp.js deal                    # the board: every open deal, most urgent first
+node mp.js deal due                # only what is owed today, with the §11 gap for each
+node mp.js deal open <id>          # start one, seeded from seen_listings.md + captures/
+node mp.js deal <id>               # read one deal
+node mp.js deal vin <id> <VIN>     # record a VIN — validates it, writes seen_listings.md too
+node mp.js deal log <id> "..."     # dated line in the Timeline
+node mp.js deal note <id> photos "..."   # what the dashboard photo showed
+node mp.js deal appt <id> "2026-08-30 10:00" --where "..."
+node mp.js deal close <id> passed
+```
+
+Playbook §12 ("The deal tracker") is the authority on the stages and on which
+tier owns which fact. Two things about it are worth knowing before you touch
+it:
+
+- **`ready` is computed, not claimed.** What a car owes before you drive comes
+  from §11's pre-visit table, read out of the playbook at run time and scaled
+  to the car's distance band. Nothing is hardcoded in the tool.
+- **A seller's claim is not verification.** "No warning lights" in a message
+  does not satisfy the dashboard requirement; it gets recorded as a claim and
+  the chase continues.
+- **`deal vin` and `deal close` sync to `seen_listings.md` by default** — pass
+  `--no-sync` on the rare run where you want the deal file updated without
+  touching the tracker.
+- **Unreviewed photos are a computed block, not a claim.** `node mp.js thread`
+  counts the images in a conversation and downloads them; the deal reads
+  `BLOCKED — needs you` until a human describes what they showed. The tool
+  never guesses at a photo's contents, and never advances a stage because
+  something looked plausible.
 
 ## Reading results out of the browser
 
@@ -98,7 +153,21 @@ The tool is read-only. It never scrolls, clicks, or messages a seller.
   listings. 24 is Facebook's page size. Scroll by hand until it stops growing.
   Playbook §8a.
 - **Never contact sellers.** Message templates in §11 are for the user to
-  send by hand.
+  send by hand. The deal tracker records what was sent and what came back; it
+  never sends anything. `inbox` and `thread` are read-only for the same reason:
+  they read a tab the user opened and never scroll, click, or type.
+- **Reach a conversation through the listing, not the inbox.** Facebook puts no
+  listing ID in the inbox — rows are bare divs with no anchor — so matching a
+  conversation to a car by name and title is a guess, and three people selling a
+  2018 RAV4 collapse onto one deal. `node mp.js thread <listing-id>` opens the
+  listing, where that seller's conversation already is, and the ID is known
+  throughout. Use `mp.js inbox` only to find conversations with no deal file.
+  If a conversation ever must be matched from the inbox, offer candidates and
+  let the user confirm with `deal thread` — never auto-bind.
+- **Don't put conversation state in `seen_listings.md`.** It keeps three
+  summary cells — `VIN Status`, `Dashboard Status`, `Effective Cash Price` —
+  and `node mp.js deal` writes those back mechanically. Everything else about
+  a conversation belongs in the deal file.
 
 ## Tracker history
 

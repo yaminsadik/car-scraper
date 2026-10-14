@@ -38,6 +38,7 @@ Read three files before touching a browser:
 | `used_car_buying_playbook.md` | What are the rules? |
 | `search_checkpoint.md` | Where did the last run stop? |
 | `seen_listings.md` | Which listings have already been judged? |
+| `deals/INDEX.md` | Which sellers am I mid-conversation with, and what does each one still owe? |
 
 Skipping this is how a run ends up re-opening fifty listings it already
 rejected last week.
@@ -124,7 +125,10 @@ Known permanent rejections do not need to be opened again.
 
 There is no artificial per-chat open limit. Checkpoint every 5 listing opens;
 continue until the cell is complete, the user stops, or a real constraint
-requires a clean handoff. Card triage remains unlimited.
+requires a clean handoff. Card triage remains unlimited. When the constraint
+is the assistant’s context window, freeze the remaining ID queue in the
+current chat and hand packed worker prompts to new Agent chats rather than
+compacting or asking the next chat to rediscover the queue — `DEV-JOURNAL.md`.
 
 Use one reusable scratch tab. Expand the description once and collect every
 field in a single pass. Never reopen a listing to fetch one more field.
@@ -222,6 +226,117 @@ filter and a far car has to earn the trip:
 illuminate during the ignition-on bulb check, so an engine-off dashboard photo
 proves nothing at all. The car must be running, in Park (or READY for a
 hybrid), with the odometer and warning-light area visible.
+
+---
+
+## The conversation loop — what you do once sellers start replying
+
+Everything above finds cars. This part is what happens after, and it is a
+different shape of problem: not a funnel but a daily loop over a pile of
+conversations that grows faster than you can read it.
+
+The pile is the whole difficulty. A Marketplace inbox with 167 car
+conversations in it gives you no way to see which ones moved since yesterday,
+which are stalled waiting on you, and which are about a laptop. Opening all of
+them to find the eight that changed is the part that does not scale — so that
+is the part the tools do, and only that part.
+
+There are two ways in, and they answer different questions.
+
+**Working the cars you already track** — this is the daily loop, and it never
+touches the inbox. `deal due` says which car owes something; `thread <id>`
+opens that listing, where the conversation with its seller already is. The
+listing ID is known the whole way through, so there is nothing to search for
+and nothing to match.
+
+```mermaid
+flowchart TD
+    A[node mp.js deal due] --> B([Pick a car that owes something])
+    B --> C[node mp.js thread &lt;id&gt;<br/>opens that listing and focuses it]
+    C --> D([Click &quot;Message&quot; so the<br/>conversation is on screen])
+    D --> E[node mp.js thread &lt;id&gt; again<br/>transcript saved, photos downloaded]
+
+    classDef you fill:#fff3cd,stroke:#8a6d3b,color:#3a2f10;
+    classDef tool fill:#e7f0fb,stroke:#31577f,color:#12283d;
+    class B,D you;
+    class A,C,E tool;
+```
+
+**Finding conversations you are not tracking at all** — that is what the inbox
+sweep is for, and it is the only thing it is needed for. Of 167 car
+conversations in my inbox, only 40 had a deal file.
+
+```mermaid
+flowchart TD
+    F([Scroll the conversation list<br/>to the bottom by hand]) --> G[node mp.js inbox]
+    G --> H{Rows marked<br/>NOT TRACKED?}
+    H -- no --> I([Nothing new — work the board instead])
+    H -- yes --> J([Find that listing on Marketplace,<br/>then: node mp.js deal open &lt;id&gt;])
+
+    classDef you fill:#fff3cd,stroke:#8a6d3b,color:#3a2f10;
+    classDef tool fill:#e7f0fb,stroke:#31577f,color:#12283d;
+    class F,I,J you;
+    class G tool;
+```
+
+**Then, for the conversation you just read:**
+
+```mermaid
+flowchart TD
+    K{What came in?}
+    K -- photos --> L([BLOCKED — open the files and look])
+    L --> M[deal note &lt;id&gt; photos<br/>clears the block]
+    K -- a VIN --> N[deal vin &lt;id&gt; &lt;VIN&gt;<br/>refused unless the check digit passes]
+    K -- nothing new --> O
+    M --> O
+    N --> O[node mp.js deal due<br/>what §11 still owes at this distance]
+
+    O --> P{Gap closed?}
+    P -- no --> Q[msg &lt;id&gt; --next<br/>copies the right template]
+    Q --> R([Paste it and hit send])
+    P -- yes --> T{Rebuilt title?}
+    T -- yes --> U([Open the auction links.<br/>Side or rear damage: fine.<br/>Extensive: reject.])
+    T -- no --> V
+    U --> V([deal appt — book the visit])
+    V --> W([Drive, inspect, decide])
+    R --> X([Next car])
+    W --> X
+
+    classDef you fill:#fff3cd,stroke:#8a6d3b,color:#3a2f10;
+    classDef tool fill:#e7f0fb,stroke:#31577f,color:#12283d;
+    class L,R,U,V,W,X you;
+    class M,N,O,Q tool;
+```
+
+**Amber is you. Blue is the tool.** Every amber box is something only a person
+can do, and each one is deliberate rather than unfinished:
+
+- **Scrolling** — automated scrolling does not trigger Facebook's loader, the
+  founding constraint of this whole project (§8a). The conversation list pages
+  exactly like the search feed.
+- **Clicking a conversation open** — Facebook puts no listing ID and no link
+  in the inbox rows, so there is nothing to navigate to; and scripted clicking
+  is what gets accounts banned.
+- **Looking at a photo** — the tool knows an image arrived and knows nobody
+  has read it. It cannot read it. It says so and stops.
+- **Sending every message** — §11, without exception.
+- **Judging collision damage** and making the call.
+
+**Why the listing route is the one to prefer.** Facebook gives no listing ID
+anywhere in the inbox, so matching a conversation to a car by seller name and
+vehicle title is a guess — three different people selling a 2018 RAV4 collapse
+onto one deal under any similarity score. Going the other way removes the
+problem instead of solving it: open the listing you already have the ID for,
+and the conversation with that seller is on the page. Nothing to match, nothing
+to hunt for among two hundred rows. Reading it that way also teaches the tool
+the inbox key for free, so the sweep shows it linked next time without anyone
+doing a binding pass.
+
+**Nothing advances on an assertion.** A VIN read off a blurry photo is a
+*candidate* until the check digit passes; a seller's "no warning lights" is a
+claim, not a verified dashboard; a stage moves only on a fact the tool checked
+itself. That is what makes the loop safe to hand to a smaller, cheaper model —
+the worst it can do is leave a gap open, not close one that is still open.
 
 ---
 

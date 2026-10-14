@@ -5,7 +5,7 @@ const os = require('os');
 const path = require('path');
 
 const { parseRow, selectMarketplaceTab } = require('../mp');
-const { isNonCar, loadCaptures, mergeCaptures, toCsv } = require('../merge');
+const { isNonCar, loadCaptures, mergeCaptures, reviewReason, toCsv } = require('../merge');
 const { parseCsv } = require('../validate');
 
 const feed = (targetId, url) => ({ targetId, url, type: 'page', title: targetId });
@@ -40,6 +40,75 @@ test('parseRow handles reduced-price card labels', () => {
   assert.equal(row.wasPrice, 6500);
   assert.equal(row.make, 'Toyota');
   assert.equal(row.city, 'Fort Lauderdale');
+});
+
+test('parseRow keeps cards a quiet seller left incomplete', () => {
+  const blankCity = parseRow({
+    id: '1000000000000201',
+    position: 3,
+    label: '2007 Toyota prius Four Hatchback 4D, $4,800, , listing 1000000000000201',
+  });
+  assert.equal(blankCity.parsed, true);
+  assert.equal(blankCity.make, 'Toyota');
+  assert.equal(blankCity.price, 4800);
+  assert.equal(blankCity.city, '');
+
+  const spelledOutState = parseRow({
+    id: '1000000000000202',
+    position: 4,
+    label: '2016 GMC acadia Sport Utility 4D, $6,000, Country Walk, Florida, listing 1000000000000202',
+  });
+  assert.equal(spelledOutState.parsed, true);
+  assert.equal(spelledOutState.city, 'Country Walk');
+  assert.equal(spelledOutState.state, 'FL');
+
+  const noTitle = parseRow({
+    id: '1000000000000203',
+    position: 5,
+    label: ', $5,500, Pompano Beach, FL, listing 1000000000000203',
+  });
+  assert.equal(noTitle.parsed, true);
+  assert.equal(noTitle.price, 5500);
+  assert.equal(noTitle.make, '');
+  assert.equal(noTitle.city, 'Pompano Beach');
+
+  const makeIdLeak = parseRow({
+    id: '1000000000000204',
+    position: 6,
+    label: '2020 308436969822020 honda civic EX-L, $8,999, Miami, FL, listing 1000000000000204',
+  });
+  assert.equal(makeIdLeak.make, 'honda');
+  assert.equal(makeIdLeak.model, 'civic EX-L');
+});
+
+test('reviewReason flags cards that cannot be triaged from the title alone', () => {
+  assert.equal(reviewReason({ year: 2010, make: 'Toyota' }), '');
+  assert.equal(reviewReason({ year: '', make: '' }), 'no-title');
+  assert.equal(reviewReason({ year: 2011, make: 'Camry' }), 'unknown-make');
+  assert.equal(reviewReason({ year: 2016, make: 'Chevrolet' }), '');
+  assert.equal(reviewReason({ year: '', make: 'Toyota' }), 'no-year');
+});
+
+test('merged rows carry the review flag so a quiet card cannot vanish', () => {
+  const capture = {
+    file: 'pass.json',
+    data: {
+      capturedAt: '2026-08-21T10:00:00.000Z',
+      listings: [
+        { id: '1', year: 2010, make: 'Toyota', model: 'Corolla', price: 5000, label: 'a' },
+        { id: '2', year: null, make: '', model: '', price: 5500, label: 'b' },
+        { id: '3', year: 2011, make: 'Camry', model: 'se', price: 6300, label: 'c' },
+      ],
+    },
+  };
+  const { rows } = mergeCaptures([capture]);
+  const byId = Object.fromEntries(rows.map((row) => [row.id, row]));
+
+  assert.equal(rows.length, 3, 'no row is dropped for being unreadable');
+  assert.equal(byId['1'].review, '');
+  assert.equal(byId['2'].review, 'no-title');
+  assert.equal(byId['3'].review, 'unknown-make');
+  assert.match(toCsv(rows).split('\n')[0], /,review,/);
 });
 
 test('non-car classifier catches known leaks without matching Navigation or Suzuki cars', () => {

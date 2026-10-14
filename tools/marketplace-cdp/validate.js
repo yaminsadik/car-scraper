@@ -5,6 +5,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { parseRow } = require('./mp');
 
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
 const PATHS = {
@@ -101,8 +102,15 @@ function validateFeedCaptures(dir, errors, warnings) {
     const ids = capture.listings.map((row) => String(row.id || ''));
     if (ids.some((id) => !id)) errors.push(`${file} contains a listing without an id`);
     addDuplicateErrors(ids.filter(Boolean), `${file} listing id`, errors);
-    const unparsed = capture.listings.filter((row) => !row.parsed).length;
-    if (unparsed) warnings.push(`${file} contains ${unparsed} unparsed card label(s)`);
+    // Judge against the current parser, not the flag stored at read time —
+    // merge.js re-derives from the raw label, so an old failure that today's
+    // parser can read is already recovered and is not worth warning about.
+    const unparsed = capture.listings.filter(
+      (row) => !parseRow({ id: row.id, position: row.position, label: row.label }).parsed
+    ).length;
+    if (unparsed) {
+      warnings.push(`${file} contains ${unparsed} card label(s) the parser still cannot read`);
+    }
     rows += capture.listings.length;
   }
   return { files: files.length, rows };

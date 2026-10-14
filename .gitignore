@@ -4,6 +4,8 @@
 .vscode/
 *.log
 *.tmp
+__pycache__/
+*.pyc
 
 # Dependencies and local browser state
 node_modules/
@@ -20,6 +22,14 @@ captures/*
 !captures/README.md
 seen_listings.md
 search_checkpoint.md
+german_seen_listings.md
+german_checkpoint.md
+
+# Deal tracker — seller names, VINs, and appointment locations
+deals/
+
+# Local copy-paste agent prompts
+prompts/
 
 # Historical private search data; keep only the public archive policy
 archive/*

@@ -272,7 +272,7 @@ represented by omitting <code>sortBy</code> from the URL.</p>
 
 </div>
 
-<h2>The two-tier log</h2>
+<h2>The three-tier log</h2>
 <div class="tierwrap">
   <div class="tier">
     <h4 style="color:var(--tool)">Tier 1 — raw capture</h4>
@@ -292,6 +292,16 @@ represented by omitting <code>sortBy</code> from the URL.</p>
       <li>Written by the assistant, with reasoning</li>
       <li>Hand-meaningful — this is what you'd actually read</li>
       <li>Append/update in place, never rewritten from scratch</li>
+    </ul>
+  </div>
+  <div class="tier">
+    <h4 style="color:var(--you)">Tier 3 — deal tracker</h4>
+    <p><code>deals/&lt;listing-id&gt;.md</code> → <code>deals/INDEX.md</code></p>
+    <ul>
+      <li>Only the handful that turned into a conversation</li>
+      <li>What the seller said, what the VIN showed, what the photos showed, when you're meeting</li>
+      <li>One small file per deal — edit it without touching the big tracker</li>
+      <li><code>node mp.js deal due</code> tells you what §11 still owes before you drive</li>
     </ul>
   </div>
 </div>

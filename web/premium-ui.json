@@ -1,0 +1,12 @@
+{
+  "sourceRoots": ["src"],
+  "locale": "en-US",
+  "ownership": {
+    "Select/Listbox": "native"
+  },
+  "requiredCommands": ["build", "sites"],
+  "commands": {
+    "build": "npm run build",
+    "sites": "npm run test:sites"
+  }
+}
